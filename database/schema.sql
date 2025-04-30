@@ -1,8 +1,48 @@
+-- MLB Teams Table (must be first for FK references)
+CREATE TABLE IF NOT EXISTS teams (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    abbreviation VARCHAR(10) NOT NULL UNIQUE
+);
+
+-- Insert all 30 MLB teams (normalized abbreviations)
+INSERT INTO teams (name, abbreviation) VALUES
+('Arizona Diamondbacks', 'ARI'),
+('Atlanta Braves', 'ATL'),
+('Baltimore Orioles', 'BAL'),
+('Boston Red Sox', 'BOS'),
+('Chicago White Sox', 'CWS'),
+('Chicago Cubs', 'CHC'),
+('Cincinnati Reds', 'CIN'),
+('Cleveland Guardians', 'CLE'),
+('Colorado Rockies', 'COL'),
+('Detroit Tigers', 'DET'),
+('Houston Astros', 'HOU'),
+('Kansas City Royals', 'KC'),
+('Los Angeles Angels', 'LAA'),
+('Los Angeles Dodgers', 'LAD'),
+('Miami Marlins', 'MIA'),
+('Milwaukee Brewers', 'MIL'),
+('Minnesota Twins', 'MIN'),
+('New York Yankees', 'NYY'),
+('New York Mets', 'NYM'),
+('Oakland Athletics', 'OAK'),
+('Philadelphia Phillies', 'PHI'),
+('Pittsburgh Pirates', 'PIT'),
+('San Diego Padres', 'SD'),
+('San Francisco Giants', 'SF'),
+('Seattle Mariners', 'SEA'),
+('St. Louis Cardinals', 'STL'),
+('Tampa Bay Rays', 'TB'),
+('Texas Rangers', 'TEX'),
+('Toronto Blue Jays', 'TOR'),
+('Washington Nationals', 'WSH');
+
 -- migrations/001_create_players.sql
 CREATE TABLE IF NOT EXISTS players (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    team VARCHAR(50),
+    team_id INT REFERENCES teams(id),
     position VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -11,15 +51,15 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE TABLE IF NOT EXISTS games (
     id SERIAL PRIMARY KEY,
     date DATE NOT NULL,
-    home_team VARCHAR(50),
-    away_team VARCHAR(50),
+    home_team_id INT REFERENCES teams(id),
+    away_team_id INT REFERENCES teams(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Table to store team statistics
 CREATE TABLE IF NOT EXISTS team_stats (
     id SERIAL PRIMARY KEY,
-    team VARCHAR(50) NOT NULL,
+    team_id INT REFERENCES teams(id),
     season_year INT NOT NULL,
     wins INT,
     losses INT,
@@ -27,7 +67,7 @@ CREATE TABLE IF NOT EXISTS team_stats (
     is_live BOOLEAN DEFAULT TRUE
 );
 
-ALTER TABLE team_stats ADD CONSTRAINT unique_team_season UNIQUE (team, season_year);
+ALTER TABLE team_stats ADD CONSTRAINT unique_team_season UNIQUE (team_id, season_year);
 
 -- Table to store player statistics
 CREATE TABLE IF NOT EXISTS player_stats (
@@ -53,15 +93,15 @@ CREATE TABLE IF NOT EXISTS data_source_status (
 -- Table to store team schedule
 CREATE TABLE IF NOT EXISTS team_schedule (
     id SERIAL PRIMARY KEY,
-    team VARCHAR(50) NOT NULL,
+    team_id INT REFERENCES teams(id),
     game_date DATE NOT NULL,
-    opponent VARCHAR(50),
+    opponent_id INT REFERENCES teams(id),
     location VARCHAR(20),
     status VARCHAR(20),
     last_updated TIMESTAMP NOT NULL,
     is_live BOOLEAN DEFAULT TRUE
 );
-ALTER TABLE team_schedule ADD CONSTRAINT unique_team_game UNIQUE (team, game_date, opponent);
+ALTER TABLE team_schedule ADD CONSTRAINT unique_team_game UNIQUE (team_id, game_date, opponent_id);
 
 -- Table to store player injuries
 CREATE TABLE IF NOT EXISTS player_injuries (

@@ -7,5 +7,10 @@ edition = "2021"
 actix-web = "4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tokio-postgres = { version = "0.7", features = ["with-uuid-0_8"] }
 tokio = { version = "1", features = ["full"] }
-# Add more as needed
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+log = "0.4"
+env_logger = "0.11"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }

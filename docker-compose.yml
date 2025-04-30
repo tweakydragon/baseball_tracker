@@ -2,6 +2,72 @@
 version: '3.8'
 
 services:
+  # 1. Database must start first for all other services to connect
+  database:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=baseball_stats
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    networks:
+      - baseball-network
+
+  # 2. Historical stats service depends on database
+  historical-stats:
+    build: ./historical-stats
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@database:5432/baseball_stats
+    depends_on:
+      - database
+    networks:
+      - baseball-network
+
+  # 3. Recommendation engine depends on database
+  recommendation-engine:
+    build: ./recommendation-engine
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@database:5432/baseball_stats
+    depends_on:
+      - database
+    networks:
+      - baseball-network
+
+  # 4. Realtime game is independent, can start after DB
+  realtime-game:
+    build: ./realtime-game
+    ports:
+      - "4000:4000"
+    networks:
+      - baseball-network
+
+  # 5. Data pipeline depends on database and historical-stats
+  data-pipeline:
+    build: ./data-pipeline
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@database:5432/baseball_stats
+    depends_on:
+      - database
+      - historical-stats
+    networks:
+      - baseball-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports:
+      - "8081:8081"
+
+  # 6. API Gateway depends on all backend APIs
   api-gateway:
     build: ./api-gateway
     ports:
@@ -15,42 +81,7 @@ services:
     networks:
       - baseball-network
 
-  data-pipeline:
-    build: ./data-pipeline
-    environment:
-      - DATABASE_URL=postgres://postgres:postgres@database:5432/baseball_stats
-    depends_on:
-      - database
-    networks:
-      - baseball-network
-
-  historical-stats:
-    build: ./historical-stats
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgres://postgres:postgres@database:5432/baseball_stats
-    depends_on:
-      - database
-    networks:
-      - baseball-network
-
-  realtime-game:
-    build: ./realtime-game
-    ports:
-      - "4000:4000"
-    networks:
-      - baseball-network
-
-  recommendation-engine:
-    build: ./recommendation-engine
-    ports:
-      - "8001:8001"
-    depends_on:
-      - database
-    networks:
-      - baseball-network
-
+  # 7. Frontend depends on API Gateway
   frontend:
     build: ./frontend
     ports:
@@ -58,19 +89,7 @@ services:
     networks:
       - baseball-network
 
-  database:
-    image: postgres:14-alpine
-    environment:
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=baseball_stats
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - baseball-network
-
+  # Redis is optional, can be started at any time
   redis:
     image: redis:7-alpine
     ports:

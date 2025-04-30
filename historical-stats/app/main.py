@@ -4,6 +4,25 @@ from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
 from typing import Optional
 import os
+import logging
+import structlog
+import sys
+
+logging.basicConfig(format="%(message)s", stream=sys.stdout, level=logging.INFO)
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.stdlib.add_log_level,
+        structlog.processors.JSONRenderer()
+    ],
+    wrapper_class=structlog.stdlib.BoundLogger,
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
+)
+logger = structlog.get_logger()
+
+logger.info("Starting historical-stats service", service="historical-stats")
 
 app = FastAPI()
 router = APIRouter()
@@ -18,20 +37,22 @@ def get_db_conn():
     """
     return psycopg2.connect(DB_URL)
 
-def get_team_record(team_id: str):
-    """
-    Retrieves the latest team record for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Team record with wins, losses, last_updated, and is_live
-    """
+def get_team_id_by_abbr(abbr):
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM teams WHERE abbreviation = %s", (abbr.upper(),))
+            row = cur.fetchone()
+            if row:
+                return row[0]
+            raise ValueError(f"Team abbreviation {abbr} not found")
+
+def get_team_record(team_id: int):
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT wins, losses, last_updated, is_live
                 FROM team_stats
-                WHERE team = %s
+                WHERE team_id = %s
                 ORDER BY last_updated DESC
                 LIMIT 1
             """, (team_id,))
@@ -39,36 +60,28 @@ def get_team_record(team_id: str):
             if row:
                 wins, losses, last_updated, is_live = row
                 return {
-                    "team": team_id,
+                    "team_id": team_id,
                     "wins": wins,
                     "losses": losses,
                     "last_updated": last_updated.isoformat(),
                     "is_live": is_live
                 }
-            # fallback: archived
             return {
-                "team": team_id,
+                "team_id": team_id,
                 "wins": 0,
                 "losses": 0,
                 "last_updated": None,
                 "is_live": False
             }
 
-def get_top_players(team_id: str):
-    """
-    Retrieves the top players for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Top players with their stats, last_updated, and is_live
-    """
+def get_top_players(team_id: int):
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT stat_json, last_updated, is_live
                 FROM player_stats
                 WHERE player_id IN (
-                    SELECT id FROM players WHERE team = %s
+                    SELECT id FROM players WHERE team_id = %s
                 )
                 ORDER BY last_updated DESC
                 LIMIT 5
@@ -88,28 +101,37 @@ def get_top_players(team_id: str):
                 "is_live": is_live
             }
 
-def upsert_team_stats(team, season_year, wins, losses, is_live):
-    """
-    Inserts or updates team stats for the given team and season year.
-    Args:
-        team (str): Team identifier
-        season_year (int): Season year
-        wins (int): Number of wins
-        losses (int): Number of losses
-        is_live (bool): Whether the data is live
-    """
+def upsert_team_stats(team_abbr, season_year, wins, losses, is_live):
+    team_id = get_team_id_by_abbr(team_abbr)
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO team_stats (team, season_year, wins, losses, last_updated, is_live)
+                INSERT INTO team_stats (team_id, season_year, wins, losses, last_updated, is_live)
                 VALUES (%s, %s, %s, %s, NOW(), %s)
-                ON CONFLICT (team, season_year)
+                ON CONFLICT (team_id, season_year)
                 DO UPDATE SET
                     wins = EXCLUDED.wins,
                     losses = EXCLUDED.losses,
                     last_updated = NOW(),
                     is_live = EXCLUDED.is_live
-            """, (team, season_year, wins, losses, is_live))
+            """, (team_id, season_year, wins, losses, is_live))
+        conn.commit()
+
+def upsert_team_schedule(team_abbr, game_date, opponent_abbr, location, status, is_live):
+    team_id = get_team_id_by_abbr(team_abbr)
+    opponent_id = get_team_id_by_abbr(opponent_abbr)
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO team_schedule (team_id, game_date, opponent_id, location, status, last_updated, is_live)
+                VALUES (%s, %s, %s, %s, %s, NOW(), %s)
+                ON CONFLICT (team_id, game_date, opponent_id)
+                DO UPDATE SET
+                    location = EXCLUDED.location,
+                    status = EXCLUDED.status,
+                    last_updated = NOW(),
+                    is_live = EXCLUDED.is_live
+            """, (team_id, game_date, opponent_id, location, status, is_live))
         conn.commit()
 
 def upsert_player_stats(player_id, season_year, stat_json, is_live):
@@ -132,31 +154,6 @@ def upsert_player_stats(player_id, season_year, stat_json, is_live):
                     last_updated = NOW(),
                     is_live = EXCLUDED.is_live
             """, (player_id, season_year, stat_json, is_live))
-        conn.commit()
-
-def upsert_team_schedule(team, game_date, opponent, location, status, is_live):
-    """
-    Inserts or updates team schedule for the given team and game date.
-    Args:
-        team (str): Team identifier
-        game_date (str): Game date
-        opponent (str): Opponent team identifier
-        location (str): Game location
-        status (str): Game status
-        is_live (bool): Whether the data is live
-    """
-    with get_db_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO team_schedule (team, game_date, opponent, location, status, last_updated, is_live)
-                VALUES (%s, %s, %s, %s, %s, NOW(), %s)
-                ON CONFLICT (team, game_date, opponent)
-                DO UPDATE SET
-                    location = EXCLUDED.location,
-                    status = EXCLUDED.status,
-                    last_updated = NOW(),
-                    is_live = EXCLUDED.is_live
-            """, (team, game_date, opponent, location, status, is_live))
         conn.commit()
 
 def upsert_player_injury(player_id, injury, status, expected_return, is_live):
@@ -183,30 +180,23 @@ def upsert_player_injury(player_id, injury, status, expected_return, is_live):
             """, (player_id, injury, status, expected_return, is_live))
         conn.commit()
 
-def get_team_schedule(team_id: str):
-    """
-    Retrieves the schedule for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Team schedule with games, last_updated, and is_live
-    """
+def get_team_schedule(team_id: int):
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT game_date, opponent, location, status, last_updated, is_live
+                SELECT game_date, opponent_id, location, status, last_updated, is_live
                 FROM team_schedule
-                WHERE team = %s
+                WHERE team_id = %s
                 ORDER BY game_date ASC
             """, (team_id,))
             games = []
             last_updated = None
             is_live = False
             for row in cur.fetchall():
-                game_date, opponent, location, status, lu, live = row
+                game_date, opponent_id, location, status, lu, live = row
                 games.append({
                     "date": game_date.isoformat(),
-                    "opponent": opponent,
+                    "opponent_id": opponent_id,
                     "location": location,
                     "status": status
                 })
@@ -219,21 +209,14 @@ def get_team_schedule(team_id: str):
                 "is_live": is_live
             }
 
-def get_player_injuries(team_id: str):
-    """
-    Retrieves the player injuries for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Player injuries with details, last_updated, and is_live
-    """
+def get_player_injuries(team_id: int):
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT pi.player_id, p.name, pi.injury, pi.status, pi.expected_return, pi.last_updated, pi.is_live
                 FROM player_injuries pi
                 JOIN players p ON pi.player_id = p.id
-                WHERE p.team = %s
+                WHERE p.team_id = %s
             """, (team_id,))
             injuries = []
             last_updated = None
@@ -288,57 +271,29 @@ def check_and_seed_db():
         upsert_player_injury(1, "Hamstring", "Day-to-day", "2025-05-05", True)
         # ...repeat for other teams/players as needed...
 
-@app.get("/teams/{team_id}/record")
-def team_record(team_id: str):
-    """
-    Endpoint to get the team record for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Team record
-    """
+@app.get("/teams/{team_abbr}/record")
+def team_record(team_abbr: str):
+    team_id = get_team_id_by_abbr(team_abbr)
     return get_team_record(team_id)
 
-@app.get("/teams/{team_id}/top-players")
-def team_top_players(team_id: str):
-    """
-    Endpoint to get the top players for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Top players
-    """
+@app.get("/teams/{team_abbr}/top-players")
+def team_top_players(team_abbr: str):
+    team_id = get_team_id_by_abbr(team_abbr)
     return get_top_players(team_id)
 
-@app.get("/teams/{team_id}/schedule")
-def team_schedule(team_id: str):
-    """
-    Endpoint to get the team schedule for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Team schedule
-    """
+@app.get("/teams/{team_abbr}/schedule")
+def team_schedule(team_abbr: str):
+    team_id = get_team_id_by_abbr(team_abbr)
     return get_team_schedule(team_id)
 
-@app.get("/teams/{team_id}/injuries")
-def team_injuries(team_id: str):
-    """
-    Endpoint to get the player injuries for the given team_id.
-    Args:
-        team_id (str): Team identifier
-    Returns:
-        dict: Player injuries
-    """
+@app.get("/teams/{team_abbr}/injuries")
+def team_injuries(team_abbr: str):
+    team_id = get_team_id_by_abbr(team_abbr)
     return get_player_injuries(team_id)
 
 @app.get("/health")
 def health():
-    """
-    Endpoint to check the health status of the application.
-    Returns:
-        dict: Health status
-    """
+    logger.info("Health check endpoint called", endpoint="/health")
     return {"status": "healthy"}
 
 def get_fantasy_breakdown(player_id: int, season_year: int = 2025):

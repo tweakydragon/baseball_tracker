@@ -22,6 +22,20 @@ const TEAM_IMAGES: Record<string, string> = {
   laa: '/images/teams/laa.png',
 };
 
+// Team abbreviation to name mapping (should match backend abbreviations)
+const TEAM_ABBR_TO_NAME: Record<string, string> = {
+  NYY: 'New York Yankees', BOS: 'Boston Red Sox', LAA: 'Los Angeles Angels',
+  LAD: 'Los Angeles Dodgers', CHC: 'Chicago Cubs', CWS: 'Chicago White Sox',
+  ATL: 'Atlanta Braves', ARI: 'Arizona Diamondbacks', BAL: 'Baltimore Orioles',
+  CIN: 'Cincinnati Reds', CLE: 'Cleveland Guardians', COL: 'Colorado Rockies',
+  DET: 'Detroit Tigers', HOU: 'Houston Astros', KC: 'Kansas City Royals',
+  MIA: 'Miami Marlins', MIL: 'Milwaukee Brewers', MIN: 'Minnesota Twins',
+  NYM: 'New York Mets', OAK: 'Oakland Athletics', PHI: 'Philadelphia Phillies',
+  PIT: 'Pittsburgh Pirates', SD: 'San Diego Padres', SF: 'San Francisco Giants',
+  SEA: 'Seattle Mariners', STL: 'St. Louis Cardinals', TB: 'Tampa Bay Rays',
+  TEX: 'Texas Rangers', TOR: 'Toronto Blue Jays', WSH: 'Washington Nationals',
+};
+
 const menuOptions = [
   { key: 'record', label: 'Current Record' },
   { key: 'topPlayers', label: 'Top Players' },
@@ -121,6 +135,16 @@ export default function TeamPage() {
 
   // Determine menu background color
   const menuBgColor = selectedTeam ? (TEAM_COLORS[selectedTeam]?.[0] || '#132448') : '#132448';
+
+  // When displaying opponent in schedule, map opponent_id to abbreviation/name if needed
+  function getTeamNameOrAbbr(teamIdOrAbbr: string | number) {
+    if (typeof teamIdOrAbbr === 'string') {
+      return TEAM_ABBR_TO_NAME[teamIdOrAbbr.toUpperCase()] || teamIdOrAbbr;
+    }
+    // If you have a mapping of team_id to abbreviation, add it here
+    // For now, just return the id
+    return teamIdOrAbbr;
+  }
 
   return (
     <div
@@ -365,7 +389,7 @@ export default function TeamPage() {
                       {schedule.schedule.map((game: any) => (
                         <tr key={game.date + game.opponent}>
                           <td>{game.date}</td>
-                          <td>{game.opponent}</td>
+                          <td>{getTeamNameOrAbbr(game.opponent_id || game.opponent)}</td>
                           <td>{game.location}</td>
                           <td>{game.status}</td>
                         </tr>

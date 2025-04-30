@@ -5,4 +5,4 @@ sqlalchemy
 psycopg2-binary
 pydantic
 pytest
-# Add more as needed
+structlog

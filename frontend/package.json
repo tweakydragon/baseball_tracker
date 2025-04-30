@@ -12,7 +12,8 @@
     "bootstrap": "^5.3.5",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "pino": "^8.0.0"
   },
   "devDependencies": {
     "@types/node": "22.15.3",
