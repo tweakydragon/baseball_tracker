@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 const TEAMS_API = '/api/teams';
 const TEAM_RECORD_API = (teamId: string) => `/api/teams/${teamId}/record`;
@@ -53,15 +54,28 @@ export default function TeamPage() {
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [record, setRecord] = useState(null);
-  const [topPlayers, setTopPlayers] = useState([]);
+  // Change topPlayers state to match expected object structure
+  const [topPlayers, setTopPlayers] = useState<{ players: any[]; is_live?: boolean; last_updated?: string } | null>(null);
   const [liveGame, setLiveGame] = useState(null);
   const [roster, setRoster] = useState([]);
-  const [injuries, setInjuries] = useState([]);
-  const [schedule, setSchedule] = useState([]);
+  const [injuries, setInjuries] = useState<{ injuries: any[]; is_live?: boolean; last_updated?: string } | null>(null);
+  const [schedule, setSchedule] = useState<{ schedule: any[]; is_live?: boolean; last_updated?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeMenu, setActiveMenu] = useState('record');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [playerStats, setPlayerStats] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Mouse event handlers for slide-out menu
+  const menuAreaRef = useRef<HTMLDivElement>(null);
+  const [isMouseInMenu, setIsMouseInMenu] = useState(false);
+
+  // Keep menu open as long as mouse is in menu area or menu is pinned
+  useEffect(() => {
+    setMenuOpen(isMouseInMenu || isPinned);
+  }, [isMouseInMenu, isPinned]);
 
   useEffect(() => {
     fetch(TEAMS_API)
@@ -79,13 +93,13 @@ export default function TeamPage() {
       fetch(TEAM_ROSTER_API(selectedTeam)).then(res => res.json()),
       fetch(TEAM_INJURIES_API(selectedTeam)).then(res => res.json()),
       fetch(TEAM_SCHEDULE_API(selectedTeam)).then(res => res.json()),
-    ]).then(([record, players, live, roster, injuries, schedule]) => {
+    ]).then(([record, players, live, roster, injuriesData, scheduleData]) => {
       setRecord(record);
       setTopPlayers(players);
       setLiveGame(live && live.in_progress ? live : null);
       setRoster(roster);
-      setInjuries(injuries);
-      setSchedule(schedule);
+      setInjuries({ injuries: injuriesData });
+      setSchedule({ schedule: scheduleData });
       setLoading(false);
     });
     setPlayerStats(null);
@@ -105,6 +119,9 @@ export default function TeamPage() {
   const teamColors = TEAM_COLORS[selectedTeam] || ['#e0e0e0', '#ffffff'];
   const teamImage = TEAM_IMAGES[selectedTeam] || '/images/teams/default.png';
 
+  // Determine menu background color
+  const menuBgColor = selectedTeam ? (TEAM_COLORS[selectedTeam]?.[0] || '#132448') : '#132448';
+
   return (
     <div
       style={{
@@ -115,18 +132,62 @@ export default function TeamPage() {
         color: '#222',
         padding: 0,
         margin: 0,
+        fontFamily: 'Inter, Segoe UI, Arial, sans-serif',
       }}
     >
-      <div style={{ display: 'flex', maxWidth: 1000, margin: '0 auto', padding: 24 }}>
-        <div style={{ minWidth: 220, marginRight: 32 }}>
-          <h1>Select a Team</h1>
+      {/* Hamburger trigger area */}
+      <div
+        style={{ position: 'fixed', left: 0, top: 0, width: 40, height: '100vh', zIndex: 1050 }}
+        onMouseEnter={() => setIsMouseInMenu(true)}
+      />
+      {/* Slide-out menu area */}
+      <div
+        ref={menuAreaRef}
+        className={`offcanvas offcanvas-start${menuOpen ? ' show' : ''}`}
+        tabIndex={-1}
+        style={{
+          width: 250,
+          transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+          transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)',
+          zIndex: 1060,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '100vh',
+          background: menuBgColor,
+          color: '#fff',
+          boxShadow: '2px 0 8px #0002',
+          fontFamily: 'Inter, Segoe UI, Arial, sans-serif',
+        }}
+        onMouseEnter={() => setIsMouseInMenu(true)}
+        onMouseLeave={() => setIsMouseInMenu(false)}
+      >
+        <div className="offcanvas-header d-flex align-items-center justify-content-between p-3 border-bottom">
+          <span style={{ fontWeight: 'bold', fontSize: 20 }}>Menu</span>
+          <div className="d-flex align-items-center gap-2">
+            <button
+              type="button"
+              className={`btn btn-sm ${isPinned ? 'btn-success' : 'btn-outline-light'}`}
+              title={isPinned ? 'Unpin menu' : 'Pin menu'}
+              onClick={() => setIsPinned(p => !p)}
+              style={{ marginRight: 8 }}
+            >
+              {isPinned ? '📌' : '📍'}
+            </button>
+            <button type="button" className="btn-close" aria-label="Close" onClick={() => { setIsPinned(false); setMenuOpen(false); }}></button>
+          </div>
+        </div>
+        {/* Team Picker moved to menu */}
+        <div className="p-3 border-bottom">
+          <h6 className="text-white">Select a Team</h6>
           <select
             value={selectedTeam}
             onChange={e => {
               setSelectedTeam(e.target.value);
               setActiveMenu('record');
             }}
-            style={{ fontSize: 18, padding: 8, width: '100%' }}
+            className="form-select"
+            style={{ fontSize: 16, marginBottom: 8 }}
           >
             <option value="">-- Choose a team --</option>
             {teams.map((team: any) => (
@@ -134,38 +195,55 @@ export default function TeamPage() {
             ))}
           </select>
           {selectedTeam && (
-            <>
-              <div style={{ margin: '32px 0', textAlign: 'center' }}>
-                <img src={teamImage} alt={selectedTeamObj?.name} style={{ width: 100, height: 100, objectFit: 'contain', margin: '0 auto' }} />
-                <div style={{ fontWeight: 'bold', fontSize: 18, marginTop: 8 }}>{selectedTeamObj?.name}</div>
-              </div>
-              <nav>
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  {menuOptions.map(opt => (
-                    <li key={opt.key} style={{ marginBottom: 12 }}>
-                      <button
-                        style={{
-                          width: '100%',
-                          padding: 10,
-                          background: activeMenu === opt.key ? '#1976d2' : '#f0f0f0',
-                          color: activeMenu === opt.key ? '#fff' : '#222',
-                          border: 'none',
-                          borderRadius: 4,
-                          cursor: 'pointer',
-                          fontWeight: activeMenu === opt.key ? 'bold' : 'normal',
-                        }}
-                        onClick={() => setActiveMenu(opt.key)}
-                      >
-                        {opt.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </>
+            <div style={{ textAlign: 'center', marginTop: 8 }}>
+              <img src={teamImage} alt={selectedTeamObj?.name} style={{ width: 60, height: 60, objectFit: 'contain', margin: '0 auto' }} />
+              <div style={{ fontWeight: 'bold', fontSize: 16, marginTop: 4 }}>{selectedTeamObj?.name}</div>
+            </div>
           )}
         </div>
-        <div style={{ flex: 1 }}>
+        <nav className="offcanvas-body p-3">
+          <ul className="nav flex-column">
+            {/* Only show menu options if a team is selected */}
+            {selectedTeam && menuOptions.map(opt => (
+              <li className="nav-item mb-2" key={opt.key}>
+                <button
+                  className={`btn w-100 text-start ${activeMenu === opt.key ? 'btn-primary' : 'btn-outline-light'}`}
+                  onClick={() => setActiveMenu(opt.key)}
+                >
+                  {opt.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+      {/* Main content area, centered and modernized */}
+      <div
+        style={{
+          minHeight: '100vh',
+          marginLeft: 250,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'Inter, Segoe UI, Arial, sans-serif',
+          background: 'none',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 700,
+            background: 'rgba(255,255,255,0.97)',
+            borderRadius: 18,
+            boxShadow: '0 4px 32px #0002',
+            padding: 40,
+            margin: '40px 0',
+            fontSize: 18,
+            fontWeight: 400,
+            color: '#222',
+            letterSpacing: 0.01,
+          }}
+        >
           {loading && <p>Loading...</p>}
           {!selectedTeam && <p>Please select a team to view details.</p>}
           {selectedTeam && !loading && (

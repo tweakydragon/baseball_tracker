@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import FantasyPointsTable from '../components/FantasyPointsTable';
+import FantasyPointsTable from '../../components/FantasyPointsTable';
 
 // Team color mapping for gradient backgrounds
 const TEAM_COLORS: Record<string, string[]> = {

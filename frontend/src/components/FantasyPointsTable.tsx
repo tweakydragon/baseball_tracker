@@ -8,15 +8,17 @@ function getFireGlow(rank: number) {
   return `0 0 ${8 * intensity}px 2px rgba(255,0,0,${0.3 + 0.07 * (11 - rank)}), 0 0 ${16 * intensity}px 4px rgba(255,140,0,${0.2 + 0.05 * (11 - rank)})`;
 }
 
-/**
- * FantasyPointsTable displays a breakdown of fantasy points for a player.
- * Highlights stats that are top-10 in the league with a fire effect.
- *
- * Props:
- *   breakdown: Array of { stat, value, pointsPerUnit, points }
- *   leagueRanks: Object mapping stat name to league rank (1 = best)
- */
-function FantasyPointsTable({ breakdown, leagueRanks }: { breakdown: any, leagueRanks: any }) {
+export interface FantasyPointsTableProps {
+  breakdown: Array<{
+    stat: string;
+    value: number;
+    pointsPerUnit: number;
+    points: number;
+  }>;
+  leagueRanks: Record<string, number>;
+}
+
+function FantasyPointsTable({ breakdown, leagueRanks }: FantasyPointsTableProps) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
       <thead>
@@ -52,5 +54,4 @@ function FantasyPointsTable({ breakdown, leagueRanks }: { breakdown: any, league
   );
 }
 
-// Example usage:
-// <FantasyPointsTable breakdown={fantasyBreakdown} leagueRanks={leagueRanks} />
+export default FantasyPointsTable;
