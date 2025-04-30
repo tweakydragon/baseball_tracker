@@ -291,6 +291,19 @@ def team_injuries(team_abbr: str):
     team_id = get_team_id_by_abbr(team_abbr)
     return get_player_injuries(team_id)
 
+@app.get("/teams")
+def get_teams():
+    """
+    Returns a list of all MLB teams with their id, abbreviation, and name.
+    """
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, abbreviation, name FROM teams ORDER BY name ASC")
+            teams = [
+                {"id": row[0], "abbreviation": row[1], "name": row[2]} for row in cur.fetchall()
+            ]
+    return teams
+
 @app.get("/health")
 def health():
     logger.info("Health check endpoint called", endpoint="/health")

@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import useSWR from 'swr';
 
-const TEAMS_API = '/api/teams';
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 const TEAM_RECORD_API = (teamId: string) => `/api/teams/${teamId}/record`;
 const TEAM_TOP_PLAYERS_API = (teamId: string) => `/api/teams/${teamId}/top-players`;
 const TEAM_LIVE_GAME_API = (teamId: string) => `/api/teams/${teamId}/live-game`;
@@ -20,20 +21,6 @@ const TEAM_IMAGES: Record<string, string> = {
   nyy: '/images/teams/nyy.png',
   bos: '/images/teams/bos.png',
   laa: '/images/teams/laa.png',
-};
-
-// Team abbreviation to name mapping (should match backend abbreviations)
-const TEAM_ABBR_TO_NAME: Record<string, string> = {
-  NYY: 'New York Yankees', BOS: 'Boston Red Sox', LAA: 'Los Angeles Angels',
-  LAD: 'Los Angeles Dodgers', CHC: 'Chicago Cubs', CWS: 'Chicago White Sox',
-  ATL: 'Atlanta Braves', ARI: 'Arizona Diamondbacks', BAL: 'Baltimore Orioles',
-  CIN: 'Cincinnati Reds', CLE: 'Cleveland Guardians', COL: 'Colorado Rockies',
-  DET: 'Detroit Tigers', HOU: 'Houston Astros', KC: 'Kansas City Royals',
-  MIA: 'Miami Marlins', MIL: 'Milwaukee Brewers', MIN: 'Minnesota Twins',
-  NYM: 'New York Mets', OAK: 'Oakland Athletics', PHI: 'Philadelphia Phillies',
-  PIT: 'Pittsburgh Pirates', SD: 'San Diego Padres', SF: 'San Francisco Giants',
-  SEA: 'Seattle Mariners', STL: 'St. Louis Cardinals', TB: 'Tampa Bay Rays',
-  TEX: 'Texas Rangers', TOR: 'Toronto Blue Jays', WSH: 'Washington Nationals',
 };
 
 const menuOptions = [
@@ -65,7 +52,6 @@ function DataStatusBadge({ isLive }: { isLive: boolean }) {
 }
 
 export default function TeamPage() {
-  const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [record, setRecord] = useState(null);
   // Change topPlayers state to match expected object structure
@@ -91,11 +77,8 @@ export default function TeamPage() {
     setMenuOpen(isMouseInMenu || isPinned);
   }, [isMouseInMenu, isPinned]);
 
-  useEffect(() => {
-    fetch(TEAMS_API)
-      .then(res => res.json())
-      .then(setTeams);
-  }, []);
+  // Fetch teams from backend
+  const { data: teams = [], isLoading: teamsLoading } = useSWR('/api/teams', fetcher);
 
   useEffect(() => {
     if (!selectedTeam) return;
@@ -139,11 +122,11 @@ export default function TeamPage() {
   // When displaying opponent in schedule, map opponent_id to abbreviation/name if needed
   function getTeamNameOrAbbr(teamIdOrAbbr: string | number) {
     if (typeof teamIdOrAbbr === 'string') {
-      return TEAM_ABBR_TO_NAME[teamIdOrAbbr.toUpperCase()] || teamIdOrAbbr;
+      const team = teams.find((t: any) => t.abbreviation === teamIdOrAbbr.toUpperCase());
+      return team ? team.name : teamIdOrAbbr;
     }
-    // If you have a mapping of team_id to abbreviation, add it here
-    // For now, just return the id
-    return teamIdOrAbbr;
+    const team = teams.find((t: any) => t.id === teamIdOrAbbr);
+    return team ? team.name : teamIdOrAbbr;
   }
 
   return (

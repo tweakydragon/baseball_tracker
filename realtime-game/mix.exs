@@ -22,6 +22,13 @@ defmodule Realtime.MixProject do
     [
       {:phoenix, "~> 1.7"},
       {:phoenix_pubsub, "~> 2.1"},
+      {:phoenix_html, "~> 3.3"},
+      {:phoenix_live_reload, "~> 1.4", only: :dev},
+      {:telemetry_metrics, "~> 0.6"},
+      {:telemetry_poller, "~> 1.0"},
+      {:gettext, "~> 0.24"},
+      {:jason, "~> 1.4"},
+      {:plug_cowboy, "~> 2.6"},
       {:telemetry, "~> 1.0"}
     ]
   end

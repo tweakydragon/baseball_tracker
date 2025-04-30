@@ -22,7 +22,7 @@ func main() {
 	log.WithField("service", "api-gateway").Info("Starting API Gateway...")
 	http.HandleFunc("/health", healthHandler)
 	fmt.Println("API Gateway running on :8080")
-	http.ListenAndServe(":8080, nil)
+	http.ListenAndServe(":8080", nil)
 }
 
 // Example: add logging to a handler
