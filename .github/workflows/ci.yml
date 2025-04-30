@@ -15,6 +15,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Build Docker images
         run: |
-          docker-compose build
+          docker compose build
       - name: Lint and Test (placeholder)
         run: echo "Add lint/test steps for each service here"
