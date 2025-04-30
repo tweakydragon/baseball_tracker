@@ -1,0 +1,57 @@
+openapi: 3.0.3
+info:
+  title: Baseball Stats API Gateway
+  version: 1.0.0
+  description: API Gateway for Baseball Stats Microservices
+servers:
+  - url: http://localhost:8080/api/public
+paths:
+  /baseball/top-batters:
+    get:
+      summary: Get top baseball batters
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Maximum number of players to return
+      responses:
+        '200':
+          description: List of top batters
+  /baseball/players/{playerId}:
+    get:
+      summary: Get player statistics
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Player statistics
+  /baseball/games/{gameId}/live:
+    get:
+      summary: Get live game statistics
+      parameters:
+        - in: path
+          name: gameId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Live game data
+  /recommendations/players/{playerId}:
+    get:
+      summary: Get player recommendations
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recommended players

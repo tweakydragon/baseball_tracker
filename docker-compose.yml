@@ -1,0 +1,89 @@
+# Basic Docker Compose for local development
+version: '3.8'
+
+services:
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - historical-stats
+      - realtime-game
+      - recommendation-engine
+    environment:
+      - PORT=8080
+    networks:
+      - baseball-network
+
+  data-pipeline:
+    build: ./data-pipeline
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@database:5432/baseball_stats
+    depends_on:
+      - database
+    networks:
+      - baseball-network
+
+  historical-stats:
+    build: ./historical-stats
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@database:5432/baseball_stats
+    depends_on:
+      - database
+    networks:
+      - baseball-network
+
+  realtime-game:
+    build: ./realtime-game
+    ports:
+      - "4000:4000"
+    networks:
+      - baseball-network
+
+  recommendation-engine:
+    build: ./recommendation-engine
+    ports:
+      - "8001:8001"
+    depends_on:
+      - database
+    networks:
+      - baseball-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - baseball-network
+
+  database:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=baseball_stats
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - baseball-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - baseball-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  baseball-network:
+    driver: bridge

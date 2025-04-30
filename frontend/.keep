@@ -1,0 +1,9 @@
+# Placeholder for Next.js/React Frontend
+# See optimal-baseball-stats.md for full structure
+
+src/
+public/
+next.config.js
+Dockerfile
+
+# Health check endpoint placeholder

@@ -1,0 +1,8 @@
+# requirements.txt for FastAPI historical-stats service
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+pytest
+# Add more as needed

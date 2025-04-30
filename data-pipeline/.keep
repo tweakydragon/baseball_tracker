@@ -1,0 +1,8 @@
+# Placeholder for Rust Data Pipeline
+# See optimal-baseball-stats.md for full structure
+
+src/
+Cargo.toml
+Dockerfile
+
+// Health check endpoint placeholder

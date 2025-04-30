@@ -1,0 +1,7 @@
+# requirements.txt for Python recommendation engine
+fastapi
+uvicorn
+scikit-learn
+pandas
+pytest
+# Add more as needed

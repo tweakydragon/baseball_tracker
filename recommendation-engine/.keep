@@ -1,0 +1,8 @@
+# Placeholder for Python Recommendation Engine
+# See optimal-baseball-stats.md for full structure
+
+app/
+requirements.txt
+Dockerfile
+
+# Health check endpoint placeholder
